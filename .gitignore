@@ -1,0 +1,7 @@
+*.backup*
+.env
+.env.*
+*.log
+resurrect/
+tmux_resurrect_*.txt
+.DS_Store
