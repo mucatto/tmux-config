@@ -7,7 +7,8 @@ A compact tmux setup with:
 - convenient splits that inherit the current working directory;
 - automatic session persistence with tmux-resurrect and tmux-continuum;
 - generic restoration of nested tmux sessions;
-- `Prefix + N` to create an outer window attached to `<name>-inner`.
+- `Prefix + Shift+n` to create an outer window attached to `<name>-inner`;
+- automatic relinking of restored `X` windows to matching `X-inner` sessions.
 
 ## Requirements
 
@@ -33,24 +34,27 @@ Back up any existing configuration, then install this one:
 ```bash
 test ! -e ~/.tmux.conf || cp -a ~/.tmux.conf ~/.tmux.conf.backup
 cp tmux.conf ~/.tmux.conf
+install -Dm755 scripts/tmux-relink-inner-sessions \
+  ~/.local/bin/tmux-relink-inner-sessions
 tmux source-file ~/.tmux.conf
 ```
 
 ## Nested workspaces
 
-Inside an outer tmux session, press `Prefix + N`, enter a workspace name, and
-tmux creates a window attached to `<name>-inner`.
+Inside an outer tmux session, press `Prefix + Shift+n` (uppercase `N`), enter a
+workspace name, and tmux creates a window attached to `<name>-inner`.
 
 The restore rules also recognize these commands:
 
 ```bash
-TMUX= tmux attach -t example-inner
-TMUX= tmux attach-session -t example-inner
-TMUX= tmux new-session -A -s example-inner
+TMUX= tmux attach -E -t example-inner
+TMUX= tmux attach-session -E -t example-inner
+TMUX= tmux new-session -A -E -s example-inner
 ```
 
-tmux-resurrect saves the complete target name. After a reboot,
-tmux-continuum restores both the sessions and their nested attachments.
+tmux-resurrect saves the complete target name. After a reboot, tmux-continuum
+restores the sessions. The relink helper then reconnects a single-pane shell
+window named `X` to an existing `X-inner` session when a client attaches.
 
 ## Notes
 

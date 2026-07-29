@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+lock_dir="$runtime_dir/tmux-relink-inner-${UID}.lock"
+
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  exit 0
+fi
+trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT
+
+copy_session_environment() {
+  local source_session="$1"
+  local target_session="$2"
+  local variable_name
+  local variable_line
+
+  for variable_name in \
+    DISPLAY \
+    XAUTHORITY \
+    WAYLAND_DISPLAY \
+    XDG_SESSION_TYPE \
+    XDG_RUNTIME_DIR \
+    DBUS_SESSION_BUS_ADDRESS; do
+    variable_line="$(tmux show-environment -t "$source_session" "$variable_name" 2>/dev/null || true)"
+    if [[ "$variable_line" == "$variable_name="* ]]; then
+      tmux set-environment -t "$target_session" \
+        "$variable_name" "${variable_line#*=}"
+    fi
+  done
+}
+
+while IFS='|' read -r outer_session window_name pane_id pane_count pane_command; do
+  [[ "$outer_session" != *-inner ]] || continue
+  [[ "$pane_count" == "1" ]] || continue
+  [[ "$pane_command" =~ ^(bash|zsh|fish|sh)$ ]] || continue
+  [[ "$window_name" =~ ^[A-Za-z0-9._-]+$ ]] || continue
+
+  inner_session="${window_name}-inner"
+  tmux has-session -t "=$inner_session" 2>/dev/null || continue
+
+  copy_session_environment "$outer_session" "$inner_session"
+  tmux send-keys -t "$pane_id" \
+    "env TMUX= tmux attach-session -E -t '$inner_session'" C-m
+done < <(
+  tmux list-panes -a \
+    -F '#{session_name}|#{window_name}|#{pane_id}|#{window_panes}|#{pane_current_command}'
+)
